@@ -73,7 +73,7 @@ class App extends \Pimple\Container
 
         /**
          * This Pimple service MUST return a shared instance
-         * of \Slim\Interfaces\EnvironmentInterface.
+         * of \Slim\Interfaces\Http\EnvironmentInterface.
          */
         $this['environment'] = function ($c) {
             return new Http\Environment($_SERVER);
@@ -252,11 +252,8 @@ class App extends \Pimple\Container
      */
     public function map(array $methods, $pattern, $callable)
     {
-        if (!is_string($pattern)) {
-            throw new \InvalidArgumentException('Route pattern must be a string');
-        }
 
-        $callable = $this->resolveCallable($callable);
+        $callable = is_string($callable) ? $this->resolveCallable($callable) : $callable;
         if ($callable instanceof \Closure) {
             $callable = $callable->bindTo($this);
         }
@@ -356,7 +353,9 @@ class App extends \Pimple\Container
         }
 
         // Finalize response
-        if (in_array($response->getStatusCode(), [204, 304])) {
+        $statusCode = $response->getStatusCode();
+        $hasBody = ($statusCode !== 204 && $statusCode !== 304);
+        if (!$hasBody) {
             $response = $response->withoutHeader('Content-Type')->withoutHeader('Content-Length');
         } else {
             $size = $response->getBody()->getSize();
@@ -385,7 +384,7 @@ class App extends \Pimple\Container
             }
 
             // Body
-            if (!in_array($response->getStatusCode(), [204, 304])) {
+            if ($hasBody) {
                 $body = $response->getBody();
                 if ($body->isAttached()) {
                     $body->rewind();
