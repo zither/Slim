@@ -82,7 +82,7 @@ class Uri implements \Psr\Http\Message\UriInterface
      * @var string
      */
     protected $query = '';
-    
+
     /**
      * Uri fragment string (without "#" prefix)
      *
@@ -147,19 +147,34 @@ class Uri implements \Psr\Http\Message\UriInterface
     public static function createFromEnvironment(Environment $env)
     {
         // Scheme
-        if ($env->has('HTTP_X_FORWARDED_PROTO') === true) {
-            $scheme = $env->get('HTTP_X_FORWARDED_PROTO');
+        if ($env->has('HTTP_X_FORWARDED_PROTO')) {
+            $scheme = $env->get('HTTP_X_FORWARDED_PROTO'); // Will be "http" or "https"
         } else {
-            $https = $env->get('HTTPS', '');
-            $scheme = empty($https) || $https === 'off' ? 'http' : 'https';
+            $isSecure = $env->get('HTTPS');
+            $scheme = (empty($isSecure) || $isSecure === 'off') ? 'http' : 'https';
         }
 
-        // Authority
-        // TODO: Respect trusted proxy X-Forwarded-* headers
-        $user = $env->get('PHP_AUTH_USER', '');
+        // Authority: Username and password
+        $username = $env->get('PHP_AUTH_USER', '');
         $password = $env->get('PHP_AUTH_PW', '');
-        $host = $env->get('HTTP_HOST', $env->get('SERVER_NAME'));
-        $port = (int)$env->get('SERVER_PORT', 80);
+
+        // Authority: Host
+        if ($env->has('HTTP_X_FORWARDED_HOST')) {
+            $host = trim(current(explode(',', $env->get('HTTP_X_FORWARDED_HOST'))));
+        } elseif ($env->has('HTTP_HOST')) {
+            $host = $env->get('HTTP_HOST');
+        } else {
+            $host = $env->get('SERVER_NAME');
+        }
+
+        // Authority: Port
+        $pos = strpos($host, ':');
+        if ($pos !== false) {
+            $port = (int)substr($host, $pos + 1);
+            $host = strstr($host, ':', true);
+        } else {
+            $port = (int)$env->get('SERVER_PORT', 80);
+        }
 
         // Path
         $requestScriptName = parse_url($env->get('SCRIPT_NAME'), PHP_URL_PATH);
@@ -178,12 +193,12 @@ class Uri implements \Psr\Http\Message\UriInterface
 
         // Query string
         $queryString = $env->get('QUERY_STRING', '');
-        
+
         // Fragment
         $fragment = '';
 
         // Build Uri
-        $uri = new static($scheme, $host, $port, $virtualPath, $queryString, $fragment, $user, $password);
+        $uri = new static($scheme, $host, $port, $virtualPath, $queryString, $fragment, $username, $password);
 
         return $uri->withBasePath($basePath);
     }
@@ -284,7 +299,6 @@ class Uri implements \Psr\Http\Message\UriInterface
      */
     public function getAuthority()
     {
-        $scheme = $this->getScheme();
         $userInfo = $this->getUserInfo();
         $host = $this->getHost();
         $port = $this->getPort();
@@ -599,7 +613,7 @@ class Uri implements \Psr\Http\Message\UriInterface
     /**
      * Filters the query string or fragment of a URI.
      *
-     * @param  $query The raw uri query string
+     * @param string $query The raw uri query string
      * @return string The percent-encoded query string
      */
     protected function filterQuery($query)
