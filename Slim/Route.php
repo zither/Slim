@@ -53,13 +53,6 @@ class Route implements RouteInterface, ServiceProviderInterface
     protected $name;
 
     /**
-     * Route parsed arguments
-     *
-     * @var array
-     */
-    protected $parsedArgs = [];
-
-    /**
      * Create new route
      *
      * @param string[] $methods       The route HTTP methods
@@ -181,10 +174,8 @@ class Route implements RouteInterface, ServiceProviderInterface
      * and captures the resultant HTTP response object. It then sends the response
      * back to the Application.
      */
-    public function run(RequestInterface $request, ResponseInterface $response, array $args)
+    public function run(RequestInterface $request, ResponseInterface $response)
     {
-        $this->parsedArgs = $args;
-
         // Traverse middleware stack and fetch updated response
         return $this->callMiddlewareStack($request, $response);
     }
@@ -205,6 +196,6 @@ class Route implements RouteInterface, ServiceProviderInterface
     {
         $function = $this->callable;
 
-        return $function($request, $response, $this->parsedArgs);
+        return $function($request, $response, $request->getAttributes());
     }
 }
