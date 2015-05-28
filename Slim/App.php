@@ -16,11 +16,8 @@ use Interop\Container\ContainerInterface;
  * App
  *
  * This is the primary class with which you instantiate,
- * configure, and run a Slim Framework application. This
- * is also a \Pimple\Container instance, meaning you can
- * register custom Pimple service providers on each
- * \Slim\App instance. The \Slim\App class also accepts
- * Slim Framework middleware.
+ * configure, and run a Slim Framework application. 
+ * The \Slim\App class also accepts Slim Framework middleware.
  *
  * @property-read array $settings App settings
  * @property-read \Slim\Interfaces\Http\EnvironmentInterface $environment 
@@ -174,6 +171,19 @@ class App
     public function options($pattern, $callable)
     {
         return $this->map(['OPTIONS'], $pattern, $callable);
+    }
+    
+    /**
+     * Add route for any HTTP method
+     *
+     * @param  string $pattern  The route URI pattern
+     * @param  mixed  $callable The route callback routine
+     *
+     * @return \Slim\Interfaces\RouteInterface
+     */
+    public function any($pattern, $callable)
+    {
+        return $this->map(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], $pattern, $callable);
     }
 
     /**
