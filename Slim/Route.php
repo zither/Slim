@@ -62,6 +62,15 @@ class Route implements RouteInterface
     protected $name;
 
     /**
+     * Output buffering mode
+     *
+     * One of: false, 'prepend' or 'append'
+     *
+     * @var boolean|string
+     */
+    protected $outputBuffering = 'append';
+
+    /**
      * Create new route
      *
      * @param string[] $methods       The route HTTP methods
@@ -112,6 +121,31 @@ class Route implements RouteInterface
     public function getPattern()
     {
         return $this->pattern;
+    }
+
+    /**
+     * Get output buffering mode
+     *
+     * @return boolean|string
+     */
+    public function getOutputBuffering()
+    {
+        return $this->outputBuffering;
+    }
+
+    /**
+     * Set output buffering mode
+     *
+     * One of: false, 'prepend' or 'append'
+     *
+     * @param boolean|string $mode
+     */
+    public function setOutputBuffering($mode)
+    {
+        if (!in_array($mode, [false, 'prepend', 'append'], true)) {
+            throw new Exception('Unknown output buffering mode');
+        }
+        $this->outputBuffering = $mode;
     }
 
     /**
@@ -212,30 +246,40 @@ class Route implements RouteInterface
      */
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response)
     {
+        $function = $this->callable;
+
         // invoke route callable
-        try {
-            ob_start();
-            $function = $this->callable;
+        if ($this->outputBuffering === false) {
             $newResponse = $function($request, $response, $request->getAttributes());
-            $output = ob_get_clean();
-        } catch (Exception $e) {
-            ob_end_clean();
-            throw $e;
+        } else {
+            try {
+                ob_start();
+                $newResponse = $function($request, $response, $request->getAttributes());
+                $output = ob_get_clean();
+            } catch (Exception $e) {
+                ob_end_clean();
+                throw $e;
+            }
         }
 
-        // if route callback returns a ResponseInterface, then use it
         if ($newResponse instanceof ResponseInterface) {
+            // if route callback returns a ResponseInterface, then use it
             $response = $newResponse;
-        }
-
-        // if route callback returns a string, then append it to the response
-        if (is_string($newResponse)) {
+        } elseif (is_string($newResponse)) {
+            // if route callback returns a string, then append it to the response
             $response->getBody()->write($newResponse);
         }
 
-        // append output buffer content if there is any
-        if ($output) {
-            $response->getBody()->write($output);
+        if (isset($output)) {
+            if ($this->outputBuffering === 'prepend') {
+                // prepend output buffer content
+                $body = new Http\Body(fopen('php://temp', 'r+'));
+                $body->write($output . $response->getBody());
+                $response = $response->withBody($body);
+            } elseif ($this->outputBuffering === 'append') {
+                // append output buffer content
+                $response->getBody()->write($output);
+            }
         }
 
         return $response;

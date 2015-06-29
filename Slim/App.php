@@ -237,6 +237,7 @@ class App
         if (method_exists($route, 'setContainer')) {
             $route->setContainer($this->container);
         }
+        $route->setOutputBuffering($this->container->get('settings')['outputBuffering']);
 
         return $route;
     }
@@ -311,8 +312,8 @@ class App
             if ($hasBody) {
                 $body = $response->getBody();
                 $body->rewind();
+                $settings = $this->container->get('settings');
                 while (!$body->eof()) {
-                    $settings = $this->container->get('settings');
                     echo $body->read($settings['responseChunkSize']);
                 }
             }
