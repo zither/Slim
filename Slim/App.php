@@ -21,7 +21,6 @@ use Slim\Http\Headers;
 use Slim\Http\Body;
 use Slim\Http\Request;
 use Slim\Interfaces\Http\EnvironmentInterface;
-use Slim\Interfaces\InvocationStrategyInterface;
 use Slim\Interfaces\RouteGroupInterface;
 use Slim\Interfaces\RouteInterface;
 use Slim\Interfaces\RouterInterface;
@@ -239,10 +238,13 @@ class App
         }
 
         $route = $this->container->get('router')->map($methods, $pattern, $callable);
-        if (method_exists($route, 'setContainer')) {
+        if (is_callable([$route, 'setContainer'])) {
             $route->setContainer($this->container);
         }
-        $route->setOutputBuffering($this->container->get('settings')['outputBuffering']);
+
+        if (is_callable([$route, 'setOutputBuffering'])) {
+            $route->setOutputBuffering($this->container->get('settings')['outputBuffering']);
+        }
 
         return $route;
     }
@@ -287,7 +289,7 @@ class App
             if ($hasBody) {
                 $size = $response->getBody()->getSize();
                 if ($size !== null) {
-                    $response = $response->withHeader('Content-Length', $size);
+                    $response = $response->withHeader('Content-Length', (string) $size);
                 }
             } else {
                 $response = $response->withoutHeader('Content-Type')->withoutHeader('Content-Length');
@@ -375,8 +377,7 @@ class App
             foreach ($routeInfo[2] as $k => $v) {
                 $routeArguments[$k] = urldecode($v);
             }
-            $request = $request->withAttribute('routeArguments', $routeArguments);
-            return $routeInfo[1]($request, $response);
+            return $routeInfo[1]($request, $response, $routeArguments);
         } elseif ($routeInfo[0] === Dispatcher::METHOD_NOT_ALLOWED) {
             /** @var callable $notAllowedHandler */
             $notAllowedHandler = $this->container->get('notAllowedHandler');

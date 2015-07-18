@@ -10,8 +10,6 @@ namespace Slim;
 
 use Closure;
 use Exception;
-use FastRoute\Dispatcher;
-use Interop\Container\ContainerInterface;
 use InvalidArgumentException;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -57,6 +55,13 @@ class Route extends Routable implements RouteInterface
      * @var boolean|string
      */
     protected $outputBuffering = 'append';
+
+    /**
+     * Route parameters
+     *
+     * @var array
+     */
+    protected $arguments = [];
 
     /**
      * Create new route
@@ -166,12 +171,12 @@ class Route extends Routable implements RouteInterface
      *
      * @param boolean|string $mode
      *
-     * @throws Exception If an unknown buffering mode is specified
+     * @throws InvalidArgumentException If an unknown buffering mode is specified
      */
     public function setOutputBuffering($mode)
     {
         if (!in_array($mode, [false, 'prepend', 'append'], true)) {
-            throw new Exception('Unknown output buffering mode');
+            throw new InvalidArgumentException('Unknown output buffering mode');
         }
         $this->outputBuffering = $mode;
     }
@@ -180,8 +185,6 @@ class Route extends Routable implements RouteInterface
      * Set route callable
      *
      * @param callable $callable
-     *
-     * @throws \InvalidArgumentException If argument is not callable
      */
     protected function setCallable(callable $callable)
     {
@@ -193,7 +196,8 @@ class Route extends Routable implements RouteInterface
      *
      * @param string $name
      *
-     * @return $this
+     * @return self
+     *
      * @throws InvalidArgumentException if the route name is not a string
      */
     public function setName($name)
@@ -203,6 +207,59 @@ class Route extends Routable implements RouteInterface
         }
         $this->name = $name;
         return $this;
+    }
+
+    /**
+     * Set a route argument
+     *
+     * @param string $name
+     * @param string $value
+     *
+     * @return self
+     */
+    public function setArgument($name, $value)
+    {
+        $this->arguments[$name] = $value;
+        return $this;
+    }
+
+    /**
+     * Replace route arguments
+     *
+     * @param array $arguments
+     *
+     * @return self
+     */
+    public function setArguments(array $arguments)
+    {
+        $this->arguments = $arguments;
+        return $this;
+    }
+
+    /**
+     * Retrieve route arguments
+     *
+     * @return array
+     */
+    public function getArguments()
+    {
+        return $this->arguments;
+    }
+
+    /**
+     * Retrieve a specific route argument
+     *
+     * @param string $name
+     * @param mixed $default
+     *
+     * @return mixed
+     */
+    public function getArgument($name, $default = null)
+    {
+        if (array_key_exists($name, $this->arguments)) {
+            return $this->arguments[$name];
+        }
+        return $default;
     }
 
     /********************************************************************************
@@ -218,11 +275,19 @@ class Route extends Routable implements RouteInterface
      *
      * @param ServerRequestInterface $request
      * @param ResponseInterface      $response
+     * @param array                  $arguments
      *
      * @return ResponseInterface
      */
-    public function run(ServerRequestInterface $request, ResponseInterface $response)
+    public function run(ServerRequestInterface $request, ResponseInterface $response, array $arguments)
     {
+        foreach ($arguments as $k => $v) {
+            $this->setArgument($k, $v);
+        }
+
+        // add this route to the request's attributes in case route middleware needs access to route arguments
+        $request = $request->withAttribute('route', $this);
+
         // Traverse middleware stack and fetch updated response
         return $this->callMiddlewareStack($request, $response);
     }
@@ -246,11 +311,11 @@ class Route extends Routable implements RouteInterface
 
         // invoke route callable
         if ($this->outputBuffering === false) {
-            $newResponse = $handler($this->callable, $request, $response);
+            $newResponse = $handler($this->callable, $request, $response, $this->arguments);
         } else {
             try {
                 ob_start();
-                $newResponse = $handler($this->callable, $request, $response);
+                $newResponse = $handler($this->callable, $request, $response, $this->arguments);
                 $output = ob_get_clean();
             } catch (Exception $e) {
                 ob_end_clean();
