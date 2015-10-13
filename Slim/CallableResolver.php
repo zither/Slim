@@ -2,9 +2,9 @@
 /**
  * Slim Framework (http://slimframework.com)
  *
- * @link      https://github.com/codeguy/Slim
+ * @link      https://github.com/slimphp/Slim
  * @copyright Copyright (c) 2011-2015 Josh Lockhart
- * @license   https://github.com/codeguy/Slim/blob/master/LICENSE (MIT License)
+ * @license   https://github.com/slimphp/Slim/blob/3.x/LICENSE.md (MIT License)
  */
 namespace Slim;
 
@@ -46,6 +46,8 @@ final class CallableResolver implements CallableResolverInterface
      */
     public function resolve($toResolve)
     {
+        $resolved = $toResolve;
+
         if (!is_callable($toResolve) && is_string($toResolve)) {
             // check for slim callable as "class:method"
             $callablePattern = '!^([^\:]+)\:([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)$!';
@@ -74,8 +76,6 @@ final class CallableResolver implements CallableResolverInterface
                     $resolved = new $class;
                 }
             }
-        } else {
-            $resolved = $toResolve;
         }
 
         if (!is_callable($resolved)) {
