@@ -161,7 +161,7 @@ class AppTest extends \PHPUnit_Framework_TestCase
         /** @var \Slim\Router $router */
         $router = $app->router;
         $router->finalize();
-        $this->assertAttributeEquals('/foo/bar', 'pattern', $router->getRoutes()[0]);
+        $this->assertAttributeEquals('/foo/bar', 'pattern', $router->lookupRoute('route0'));
     }
 
     public function testGroupDefaultSlash()
@@ -175,7 +175,7 @@ class AppTest extends \PHPUnit_Framework_TestCase
         /** @var \Slim\Router $router */
         $router = $app->router;
         $router->finalize();
-        $this->assertAttributeEquals('/foo', 'pattern', $router->getRoutes()[0]);
+        $this->assertAttributeEquals('/foo', 'pattern', $router->lookupRoute('route0'));
         
         $app = new App();
         $app->group('/foo', function () use ($app) {
@@ -186,7 +186,7 @@ class AppTest extends \PHPUnit_Framework_TestCase
         /** @var \Slim\Router $router */
         $router = $app->router;
         $router->finalize();
-        $this->assertAttributeEquals('/foo/bar', 'pattern', $router->getRoutes()[0]);
+        $this->assertAttributeEquals('/foo/bar', 'pattern', $router->lookupRoute('route0'));
         
         $app = new App();
         $app->group('/foo', function () use ($app) {
@@ -199,7 +199,7 @@ class AppTest extends \PHPUnit_Framework_TestCase
         /** @var \Slim\Router $router */
         $router = $app->router;
         $router->finalize();
-        $this->assertAttributeEquals('/foo/baz', 'pattern', $router->getRoutes()[0]);
+        $this->assertAttributeEquals('/foo/baz', 'pattern', $router->lookupRoute('route0'));
         
         $app = new App();
         $app->group('/foo', function () use ($app) {
@@ -210,7 +210,7 @@ class AppTest extends \PHPUnit_Framework_TestCase
         /** @var \Slim\Router $router */
         $router = $app->router;
         $router->finalize();
-        $this->assertAttributeEquals('/foo/bar/', 'pattern', $router->getRoutes()[0]);
+        $this->assertAttributeEquals('/foo/bar/', 'pattern', $router->lookupRoute('route0'));
     }
 
     /********************************************************************************
@@ -959,7 +959,7 @@ class AppTest extends \PHPUnit_Framework_TestCase
         $method->setAccessible(true);
 
         $response = new Response();
-        $response->write('foo');
+        $response->getBody()->write('foo');
 
         $response = $method->invoke(new App(), $response);
 
@@ -976,5 +976,29 @@ class AppTest extends \PHPUnit_Framework_TestCase
 
         $this->assertFalse($response->hasHeader('Content-Length'));
         $this->assertFalse($response->hasHeader('Content-Type'));
+    }
+
+    public function testCallingAContainerCallable()
+    {
+        $settings = [
+            'foo' => function ($c) {
+                return function ($a) {
+                    return $a;
+                };
+            }
+        ];
+        $app = new App($settings);
+
+        $result = $app->foo('bar');
+        $this->assertSame('bar', $result);
+
+        $headers = new Headers();
+        $body = new Body(fopen('php://temp', 'r+'));
+        $request = new Request('GET', Uri::createFromString(''), $headers, [], [], $body);
+        $response = new Response();
+
+        $response = $app->notFoundHandler($request, $response);
+
+        $this->assertSame(404, $response->getStatusCode());
     }
 }

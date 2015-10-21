@@ -32,6 +32,14 @@ interface RouterInterface
      */
     public function map($methods, $pattern, $handler);
 
+
+    /**
+     * Finalize registered routes in preparation for dispatching
+     *
+     * NOTE: The routes can only be finalized once.
+     */
+    public function finalize();
+
     /**
      * Dispatch router for HTTP request
      *
@@ -65,11 +73,18 @@ interface RouterInterface
      *
      * @param string $name        Route name
      *
-     * @return Route
+     * @return \Slim\Interfaces\RouteInterface
      *
      * @throws RuntimeException   If named route does not exist
      */
     public function getNamedRoute($name);
+
+    /**
+     * @param $identifier
+     *
+     * @return \Slim\Interfaces\RouteInterface
+     */
+    public function lookupRoute($identifier);
 
     /**
      * Build the path for a named route

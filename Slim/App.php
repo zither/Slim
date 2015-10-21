@@ -129,6 +129,24 @@ class App
         return $this->container->has($name);
     }
 
+    /**
+     * Calling a non-existant method on App checks to see if there's an item
+     * in the container than is callable and if so, calls it.
+     *
+     * @param  string $method
+     * @param  array $args
+     * @return mixed
+     */
+    public function __call($method, $args)
+    {
+        if ($this->container->has($method)) {
+            $obj = $this->container->get($method);
+            if (is_callable($obj)) {
+                return call_user_func_array($obj, $args);
+            }
+        }
+    }
+
     /********************************************************************************
      * Router proxy methods
      *******************************************************************************/
@@ -302,7 +320,7 @@ class App
         // Dispatch the Router first if the setting for this is on
         if ($this->container->get('settings')['determineRouteBeforeAppMiddleware'] === true) {
             // Dispatch router (note: you won't be able to alter routes after this)
-            $request = $this->dispatchRouterAndPrepareRoute($request);
+            $request = $this->dispatchRouterAndPrepareRoute($request, $router);
         }
 
         // Traverse middleware stack
@@ -418,14 +436,18 @@ class App
         // Get the route info
         $routeInfo = $request->getAttribute('routeInfo');
 
+        /** @var \Slim\Interfaces\RouterInterface $router */
+        $router = $this->container->get('router');
+
         // If router hasn't been dispatched or the URI changed then dispatch
         if (null === $routeInfo || ($routeInfo['request'] !== [$request->getMethod(), (string) $request->getUri()])) {
-            $request = $this->dispatchRouterAndPrepareRoute($request);
+            $request = $this->dispatchRouterAndPrepareRoute($request, $router);
             $routeInfo = $request->getAttribute('routeInfo');
         }
 
         if ($routeInfo[0] === Dispatcher::FOUND) {
-            return $routeInfo[1]($request, $response);
+            $route = $router->lookupRoute($routeInfo[1]);
+            return $route->run($request, $response);
         } elseif ($routeInfo[0] === Dispatcher::METHOD_NOT_ALLOWED) {
             if (!$this->container->has('notAllowedHandler')) {
                 throw new MethodNotAllowedException($response, $routeInfo[1]);
@@ -485,9 +507,9 @@ class App
      * @param ServerRequestInterface $request
      * @return ServerRequestInterface
      */
-    protected function dispatchRouterAndPrepareRoute(ServerRequestInterface $request)
+    protected function dispatchRouterAndPrepareRoute(ServerRequestInterface $request, RouterInterface $router)
     {
-        $routeInfo = $this->container->get('router')->dispatch($request);
+        $routeInfo = $router->dispatch($request);
 
         if ($routeInfo[0] === Dispatcher::FOUND) {
             $routeArguments = [];
@@ -495,10 +517,11 @@ class App
                 $routeArguments[$k] = urldecode($v);
             }
 
-            $routeInfo[1][0]->prepare($request, $routeArguments);
+            $route = $router->lookupRoute($routeInfo[1]);
+            $route->prepare($request, $routeArguments);
 
             // add route to the request's attributes in case a middleware or handler needs access to the route
-            $request = $request->withAttribute('route', $routeInfo[1][0]);
+            $request = $request->withAttribute('route', $route);
         }
 
         $routeInfo['request'] = [$request->getMethod(), (string) $request->getUri()];
