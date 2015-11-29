@@ -93,11 +93,22 @@ class ResponseTest extends \PHPUnit_Framework_TestCase
 
     /**
      * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage ReasonPhrase must be a string
      */
     public function testWithStatusInvalidReasonPhraseThrowsException()
     {
         $response = new Response();
         $response->withStatus(200, null);
+    }
+
+    public function testWithStatusEmptyReasonPhrase()
+    {
+        $response = new Response();
+        $clone = $response->withStatus(207);
+        $responsePhrase = new ReflectionProperty($response, 'reasonPhrase');
+        $responsePhrase->setAccessible(true);
+
+        $this->assertEquals('Multi-Status', $responsePhrase->getValue($clone));
     }
 
     public function testGetReasonPhrase()
@@ -108,6 +119,24 @@ class ResponseTest extends \PHPUnit_Framework_TestCase
         $responseStatus->setValue($response, '404');
 
         $this->assertEquals('Not Found', $response->getReasonPhrase());
+    }
+
+    /**
+     * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage ReasonPhrase must be supplied for this code
+     */
+    public function testMustSetReasonPhraseForUnrecognisedCode()
+    {
+        $response = new Response();
+        $response = $response->withStatus(499);
+    }
+
+    public function testSetReasonPhraseForUnrecognisedCode()
+    {
+        $response = new Response();
+        $response = $response->withStatus(499, 'Authentication timeout');
+
+        $this->assertEquals('Authentication timeout', $response->getReasonPhrase());
     }
 
     public function testGetCustomReasonPhrase()

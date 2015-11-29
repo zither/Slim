@@ -16,6 +16,7 @@ use FastRoute\RouteCollector;
 use FastRoute\RouteParser;
 use FastRoute\RouteParser\Std as StdParser;
 use FastRoute\DataGenerator;
+use Slim\Interfaces\RouteGroupInterface;
 use Slim\Interfaces\RouterInterface;
 use Slim\Interfaces\RouteInterface;
 
@@ -124,12 +125,11 @@ class Router implements RouterInterface
 
         // Prepend parent group pattern(s)
         if ($this->routeGroups) {
-            // If any route in the group only has / we remove it
-            if ($pattern === '/') {
-                $pattern = '';
-            }
             $pattern = $this->processGroups() . $pattern;
         }
+
+        // According to RFC methods are defined in uppercase (See RFC 7231)
+        $methods = array_map("strtoupper", $methods);
 
         // Add route
         $route = new Route($methods, $pattern, $handler, $this->routeGroups, $this->routeCounter);
@@ -246,7 +246,7 @@ class Router implements RouterInterface
      * @param string   $pattern
      * @param callable $callable
      *
-     * @return RouteGroup
+     * @return RouteGroupInterface
      */
     public function pushGroup($pattern, $callable)
     {

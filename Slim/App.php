@@ -113,20 +113,6 @@ class App
         return $this->addMiddleware($callable);
     }
 
-    /********************************************************************************
-     * Container proxy methods
-     *******************************************************************************/
-
-    public function __get($name)
-    {
-        return $this->container->get($name);
-    }
-
-    public function __isset($name)
-    {
-        return $this->container->has($name);
-    }
-
     /**
      * Calling a non-existant method on App checks to see if there's an item
      * in the container than is callable and if so, calls it.
@@ -252,7 +238,7 @@ class App
     public function map(array $methods, $pattern, $callable)
     {
         if ($callable instanceof Closure) {
-            $callable = $callable->bindTo($this);
+            $callable = $callable->bindTo($this->container);
         }
 
         $route = $this->container->get('router')->map($methods, $pattern, $callable);
@@ -365,54 +351,48 @@ class App
      */
     public function respond(ResponseInterface $response)
     {
-        static $responded = false;
+        // Send response
+        if (!headers_sent()) {
+            // Status
+            header(sprintf(
+                'HTTP/%s %s %s',
+                $response->getProtocolVersion(),
+                $response->getStatusCode(),
+                $response->getReasonPhrase()
+            ));
 
-        if (!$responded) {
-            // Send response
-            if (!headers_sent()) {
-                // Status
-                header(sprintf(
-                    'HTTP/%s %s %s',
-                    $response->getProtocolVersion(),
-                    $response->getStatusCode(),
-                    $response->getReasonPhrase()
-                ));
-
-                // Headers
-                foreach ($response->getHeaders() as $name => $values) {
-                    foreach ($values as $value) {
-                        header(sprintf('%s: %s', $name, $value), false);
-                    }
+            // Headers
+            foreach ($response->getHeaders() as $name => $values) {
+                foreach ($values as $value) {
+                    header(sprintf('%s: %s', $name, $value), false);
                 }
             }
+        }
 
-            // Body
-            if (!$this->isEmptyResponse($response)) {
-                $body = $response->getBody();
-                if ($body->isSeekable()) {
-                    $body->rewind();
+        // Body
+        if (!$this->isEmptyResponse($response)) {
+            $body = $response->getBody();
+            if ($body->isSeekable()) {
+                $body->rewind();
+            }
+            $settings       = $this->container->get('settings');
+            $chunkSize      = $settings['responseChunkSize'];
+            $contentLength  = $response->getHeaderLine('Content-Length');
+            if (!$contentLength) {
+                $contentLength = $body->getSize();
+            }
+            $totalChunks    = ceil($contentLength / $chunkSize);
+            $lastChunkSize  = $contentLength % $chunkSize;
+            $currentChunk   = 0;
+            while (!$body->eof() && $currentChunk < $totalChunks) {
+                if (++$currentChunk == $totalChunks && $lastChunkSize > 0) {
+                    $chunkSize = $lastChunkSize;
                 }
-                $settings       = $this->container->get('settings');
-                $chunkSize      = $settings['responseChunkSize'];
-                $contentLength  = $response->getHeaderLine('Content-Length');
-                if (!$contentLength) {
-                    $contentLength = $body->getSize();
-                }
-                $totalChunks    = ceil($contentLength / $chunkSize);
-                $lastChunkSize  = $contentLength % $chunkSize;
-                $currentChunk   = 0;
-                while (!$body->eof() && $currentChunk < $totalChunks) {
-                    if (++$currentChunk == $totalChunks && $lastChunkSize > 0) {
-                        $chunkSize = $lastChunkSize;
-                    }
-                    echo $body->read($chunkSize);
-                    if (connection_status() != CONNECTION_NORMAL) {
-                        break;
-                    }
+                echo $body->read($chunkSize);
+                if (connection_status() != CONNECTION_NORMAL) {
+                    break;
                 }
             }
-
-            $responded = true;
         }
     }
 
@@ -535,6 +515,9 @@ class App
      */
     protected function finalize(ResponseInterface $response)
     {
+        // stop PHP sending a Content-Type automatically
+        ini_set('default_mimetype', '');
+
         if ($this->isEmptyResponse($response)) {
             return $response->withoutHeader('Content-Type')->withoutHeader('Content-Length');
         }
@@ -558,6 +541,9 @@ class App
      */
     protected function isEmptyResponse(ResponseInterface $response)
     {
+        if (method_exists($response, 'isEmpty')) {
+            return $response->isEmpty();
+        }
         return in_array($response->getStatusCode(), [204, 205, 304]);
     }
 }

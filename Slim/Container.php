@@ -130,7 +130,7 @@ final class Container extends PimpleContainer implements ContainerInterface
              * @return ResponseInterface
              */
             $this['response'] = function ($c) {
-                $headers = new Headers(['Content-Type' => 'text/html']);
+                $headers = new Headers(['Content-Type' => 'text/html; charset=UTF-8']);
                 $response = new Response(200, $headers);
 
                 return $response->withProtocolVersion($c->get('settings')['httpVersion']);
@@ -161,22 +161,22 @@ final class Container extends PimpleContainer implements ContainerInterface
             };
         }
 
-        /**
-         * This service MUST return a callable
-         * that accepts three arguments:
-         *
-         * 1. Instance of \Psr\Http\Message\ServerRequestInterface
-         * 2. Instance of \Psr\Http\Message\ResponseInterface
-         * 3. Instance of \Exception
-         *
-         * The callable MUST return an instance of
-         * \Psr\Http\Message\ResponseInterface.
-         *
-         * @param Container $c
-         *
-         * @return callable
-         */
         if (!isset($this['errorHandler'])) {
+            /**
+             * This service MUST return a callable
+             * that accepts three arguments:
+             *
+             * 1. Instance of \Psr\Http\Message\ServerRequestInterface
+             * 2. Instance of \Psr\Http\Message\ResponseInterface
+             * 3. Instance of \Exception
+             *
+             * The callable MUST return an instance of
+             * \Psr\Http\Message\ResponseInterface.
+             *
+             * @param Container $c
+             *
+             * @return callable
+             */
             $this['errorHandler'] = function ($c) {
                 return new Error($c->get('settings')['displayErrorDetails']);
             };
@@ -266,5 +266,20 @@ final class Container extends PimpleContainer implements ContainerInterface
     public function has($id)
     {
         return $this->offsetExists($id);
+    }
+
+
+    /********************************************************************************
+     * Magic methods for convenience
+     *******************************************************************************/
+
+    public function __get($name)
+    {
+        return $this->get($name);
+    }
+
+    public function __isset($name)
+    {
+        return $this->has($name);
     }
 }
