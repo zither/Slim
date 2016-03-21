@@ -3,7 +3,7 @@
  * Slim Framework (http://slimframework.com)
  *
  * @link      https://github.com/slimphp/Slim
- * @copyright Copyright (c) 2011-2015 Josh Lockhart
+ * @copyright Copyright (c) 2011-2016 Josh Lockhart
  * @license   https://github.com/slimphp/Slim/blob/3.x/LICENSE.md (MIT License)
  */
 namespace Slim\Interfaces;
@@ -30,14 +30,6 @@ interface RouterInterface
      * @return RouteInterface
      */
     public function map($methods, $pattern, $handler);
-
-
-    /**
-     * Finalize registered routes in preparation for dispatching
-     *
-     * NOTE: The routes can only be finalized once.
-     */
-    public function finalize();
 
     /**
      * Dispatch router for HTTP request
